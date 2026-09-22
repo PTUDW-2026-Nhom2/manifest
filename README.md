@@ -111,33 +111,91 @@ corepack prepare pnpm@9.12.0 --activate</code></pre>
 
 <pre><code>pnpm install</code></pre>
 
-<h3>Bước 5 — Khởi động hạ tầng</h3>
+<h3>Bước 5 — Khởi động hạ tầng (Postgres, Redis, MinIO)</h3>
 
 <pre><code>docker compose up -d postgres redis minio</code></pre>
 
-<h3>Bước 6 — Chạy migration</h3>
+<p>Chờ cả 3 container ở trạng thái <code>healthy</code> rồi mới sang bước sau:</p>
 
-<pre><code>pnpm db:migrate</code></pre>
+<pre><code>docker compose ps</code></pre>
 
-<h3>Bước 7 — Chạy dự án</h3>
+<h3>Bước 6 — Chạy migration + seed dữ liệu mẫu</h3>
+
+<pre><code>pnpm db:migrate
+pnpm db:seed     # tùy chọn — sinh ≥20 danh mục, ≥100 công thức mẫu để test
+pnpm db:verify   # kiểm tra dữ liệu vừa seed đủ ngưỡng chưa</code></pre>
+
+<h3>Bước 7 — Chạy dự án (chế độ dev, hot-reload)</h3>
 
 <pre><code>pnpm dev</code></pre>
 
 <table>
   <thead>
-    <tr><th>Service</th><th>URL</th></tr>
+    <tr><th>Service</th><th>URL</th><th>Ghi chú</th></tr>
   </thead>
   <tbody>
-    <tr><td>Frontend</td><td><code>http://localhost:3000</code></td></tr>
-    <tr><td>Backend API</td><td><code>http://localhost:5000/api/v1</code></td></tr>
-    <tr><td>API Docs (Scalar)</td><td><code>http://localhost:5000/scalar</code></td></tr>
-    <tr><td>MinIO Console</td><td><code>http://localhost:9001</code></td></tr>
+    <tr><td>Frontend</td><td><code>http://localhost:3000</code></td><td>Next.js dev server</td></tr>
+    <tr><td>Backend API</td><td><code>http://localhost:5000/api/v1</code></td><td>Tất cả endpoint đều có prefix <code>/api/v1</code></td></tr>
+    <tr><td>OpenAPI / Swagger UI</td><td><code>http://localhost:5000/docs</code></td><td>Thử endpoint trực tiếp trên trình duyệt (nút <b>Authorize</b> để nhập Bearer token)</td></tr>
+    <tr><td>OpenAPI raw spec (JSON)</td><td><code>http://localhost:5000/docs-json</code></td><td>Dùng để generate client, import Postman...</td></tr>
+    <tr><td>MinIO Console</td><td><code>http://localhost:9001</code></td><td>Đăng nhập bằng <code>MINIO_ROOT_USER</code>/<code>MINIO_ROOT_PASSWORD</code> trong <code>.env</code></td></tr>
   </tbody>
 </table>
 
-<h3>Chạy toàn bộ bằng Docker</h3>
+<p>⚠️ Chạy <code>pnpm dev</code> ở chế độ này thì <b>không</b> chạy qua Nginx — frontend gọi thẳng backend qua <code>NEXT_PUBLIC_API_URL</code> trong <code>.env</code>.</p>
 
-<pre><code>docker compose up --build</code></pre>
+<hr/>
+
+<h3>Chạy toàn bộ bằng Docker (giống production)</h3>
+
+<p>Build và chạy full stack (Postgres, Redis, MinIO, backend, frontend, Nginx) trong container:</p>
+
+<pre><code>docker compose up -d --build
+# hoặc: pnpm docker:up</code></pre>
+
+<table>
+  <thead>
+    <tr><th>Service</th><th>URL mặc định</th><th>Container</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Qua Nginx (reverse proxy — dùng URL này khi test như thật)</td><td><code>http://localhost</code></td><td><code>nginx</code></td></tr>
+    <tr><td>Frontend (trực tiếp)</td><td><code>http://localhost:3000</code></td><td><code>frontend</code></td></tr>
+    <tr><td>Backend API (trực tiếp)</td><td><code>http://localhost:5000/api/v1</code></td><td><code>backend</code></td></tr>
+    <tr><td>OpenAPI / Swagger UI</td><td><code>http://localhost:5000/docs</code></td><td><code>backend</code></td></tr>
+    <tr><td>MinIO Console</td><td><code>http://localhost:9001</code></td><td><code>minio</code></td></tr>
+  </tbody>
+</table>
+
+<p><b>Cổng bị chiếm sẵn trên máy?</b> Mọi cổng đều override được qua biến môi trường (đọc từ <code>.env</code> hoặc truyền trực tiếp), không cần sửa <code>docker-compose.yml</code>:</p>
+
+<pre><code>BACKEND_PORT=4501 REDIS_PORT=6380 FRONTEND_PORT=3100 NGINX_PORT=8088 docker compose up -d --build</code></pre>
+
+<p>Xem trạng thái từng container và log khi có lỗi:</p>
+
+<pre><code>docker compose ps
+docker compose logs backend --tail 50
+docker compose logs -f backend   # theo dõi log realtime</code></pre>
+
+<p>Dừng toàn bộ stack:</p>
+
+<pre><code>docker compose down          # giữ lại volume (data Postgres/MinIO)
+docker compose down -v       # xóa luôn volume — mất hết dữ liệu, cẩn thận</code></pre>
+
+<hr/>
+
+<h3>Test API qua Swagger — lấy Bearer token thế nào?</h3>
+
+<ol>
+  <li>Mở <code>http://localhost:5000/docs</code> (hoặc <code>:4501</code> nếu đã đổi port)</li>
+  <li>Gọi <code>POST /auth/register</code> (Try it out) để tạo tài khoản, hoặc dùng tài khoản đã có</li>
+  <li>Gọi <code>POST /auth/login</code> với email/password vừa tạo → copy giá trị <code>accessToken</code> trong response</li>
+  <li>Bấm nút <b>Authorize</b> (góc trên bên phải trang Swagger) → dán <code>accessToken</code> vào ô <code>Value</code> (không cần gõ chữ <code>Bearer</code>, Swagger tự thêm) → <b>Authorize</b></li>
+  <li>Từ giờ mọi request Try it out trong Swagger sẽ tự đính kèm header <code>Authorization: Bearer &lt;token&gt;</code></li>
+</ol>
+
+<p>Access token hết hạn sau <b>15 phút</b> — hết hạn thì login lại lấy token mới.</p>
+
+<hr/>
 
 <h3>Các lệnh thường dùng</h3>
 
@@ -146,13 +204,18 @@ corepack prepare pnpm@9.12.0 --activate</code></pre>
     <tr><th>Lệnh</th><th>Chức năng</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>pnpm dev</code></td><td>Chạy song song backend và frontend</td></tr>
+    <tr><td><code>pnpm dev</code></td><td>Chạy song song backend và frontend (hot-reload, không qua Docker)</td></tr>
     <tr><td><code>pnpm dev:be</code></td><td>Chỉ chạy backend</td></tr>
     <tr><td><code>pnpm dev:fe</code></td><td>Chỉ chạy frontend</td></tr>
+    <tr><td><code>pnpm build</code></td><td>Build toàn bộ workspace</td></tr>
     <tr><td><code>pnpm lint</code></td><td>Kiểm tra lint toàn workspace</td></tr>
     <tr><td><code>pnpm typecheck</code></td><td>Kiểm tra kiểu TypeScript</td></tr>
     <tr><td><code>pnpm db:generate</code></td><td>Sinh migration từ schema Drizzle</td></tr>
     <tr><td><code>pnpm db:migrate</code></td><td>Áp dụng migration vào database</td></tr>
+    <tr><td><code>pnpm db:seed</code></td><td>Seed dữ liệu mẫu (danh mục, công thức...)</td></tr>
+    <tr><td><code>pnpm db:verify</code></td><td>Kiểm tra dữ liệu đã seed đủ ngưỡng tối thiểu</td></tr>
+    <tr><td><code>pnpm docker:up</code></td><td>Build + chạy full stack bằng Docker (nền)</td></tr>
+    <tr><td><code>pnpm docker:down</code></td><td>Dừng toàn bộ container Docker</td></tr>
   </tbody>
 </table>
 
@@ -263,19 +326,19 @@ Co-authored-by: Trần Minh Tài &lt;2312740@dlu.edu.vn&gt;</code></pre>
 
 <h3>Tiêu đề PR</h3>
 
-<p>Tiêu đề PR <b>bắt buộc</b> theo định dạng:</p>
+<p>Tiêu đề PR <b>bắt buộc</b> theo định dạng — <b>họ tên đầy đủ</b>, không viết tắt, không dùng nickname/GitHub username:</p>
 
-<pre><code>Tên-MSSV: Title</code></pre>
+<pre><code>Họ và Tên đầy đủ-MSSV: Title</code></pre>
 
 <table>
   <thead>
     <tr><th>Thành viên</th><th>Tiêu đề PR mẫu</th></tr>
   </thead>
   <tbody>
-    <tr><td>Trần Thị Phương Trang</td><td><code>Trang-2314288: Thêm CRUD công thức nấu ăn</code></td></tr>
-    <tr><td>Đinh Thị Mai Lành</td><td><code>Lành-2312660: Hoàn thiện Full-Text Search tiếng Việt</code></td></tr>
-    <tr><td>Trần Nguyễn Tuấn Anh</td><td><code>TuấnAnh-2312577: Thêm cơ chế refresh token rotation</code></td></tr>
-    <tr><td>Trần Minh Tài</td><td><code>Tài-2312740: Tích hợp upload ảnh lên MinIO</code></td></tr>
+    <tr><td>Trần Thị Phương Trang</td><td><code>Trần Thị Phương Trang-2314288: Thêm CRUD công thức nấu ăn</code></td></tr>
+    <tr><td>Đinh Thị Mai Lành</td><td><code>Đinh Thị Mai Lành-2312660: Hoàn thiện Full-Text Search tiếng Việt</code></td></tr>
+    <tr><td>Trần Nguyễn Tuấn Anh</td><td><code>Trần Nguyễn Tuấn Anh-2312577: Thêm cơ chế refresh token rotation</code></td></tr>
+    <tr><td>Trần Minh Tài</td><td><code>Trần Minh Tài-2312740: Tích hợp upload ảnh lên MinIO</code></td></tr>
   </tbody>
 </table>
 
