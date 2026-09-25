@@ -367,7 +367,7 @@ Ngắn gọn PR này làm gì và giải quyết vấn đề gì.
 
 ## Checklist
 - [ ] Code chạy được ở local
-- [ ] Đã chạy `pnpm lint` và `pnpm typecheck`
+- [ ] CI xanh (lint · typecheck · test · build)
 - [ ] Không commit file `.env`
 - [ ] Đã tự review lại diff</code></pre>
 
