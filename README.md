@@ -80,7 +80,8 @@
 <h3>Bước 1 — Clone source code</h3>
 
 <pre><code>git clone https://github.com/PTUDW-2026-Nhom2/CulinaryBlog.git
-cd CulinaryBlog</code></pre>
+cd CulinaryBlog
+git submodule update --init --recursive</code></pre>
 
 <h3>Bước 2 — Cài pnpm</h3>
 
