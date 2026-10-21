@@ -61,6 +61,12 @@
 
 <hr/>
 
+<h2>🎨 Nguồn UI</h2>
+
+<p>Frontend sử dụng <a href="https://ui.shadcn.com/">shadcn/ui</a> cài trực tiếp trong <code>apps/frontend</code>. Các primitive được lưu ở <code>src/components/ui/</code>, cấu hình tại <code>apps/frontend/components.json</code>, và design token CSS của Culinary Blog nằm trong <code>src/app/globals.css</code>. Chỉ thêm component khi có vị trí sử dụng ngay; không sao chép toàn bộ thư viện UI.</p>
+
+<hr/>
+
 <h2>🚀 Cài đặt và chạy dự án</h2>
 
 <h3>Yêu cầu môi trường</h3>
